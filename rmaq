@@ -1,0 +1,121 @@
+#!/bin/zsh
+
+# Remove the Apple quarantine (rmaq) attribute from Apple installer packages
+
+
+#GLOBAL VARIABLES#
+
+pkgfolder=$1
+
+
+##FUNCTIONS##
+
+# List all found installer packages
+funcLISTPACKAGES () {
+  mdfind -onlyin "$pkgfolder" "kMDItemContentType   == 'com.apple.installer-package-archive'"
+}
+
+# Count the total ammount of installer packages
+funcTOTALPACKAGES () {
+  mdfind -onlyin "$pkgfolder" "kMDItemContentType   == 'com.apple.installer-package-archive'" | wc -l | xargs
+}
+
+# List ammount of installer packages with quarantine attribute
+funcTOTALPACKAGESWITHQUARANTINE () {
+  mdfind -onlyin "$pkgfolder" "kMDItemContentType   == 'com.apple.installer-package-archive'" | tr \\n \\0 |  xargs -0 xattr -l | grep -c com.apple.quarantine
+}
+
+# List all found installer packages with quarantine attribute set
+funcPACKAGESWITHQUARANTINE () {
+  mdfind -onlyin "$pkgfolder" "kMDItemContentType   == 'com.apple.installer-package-archive'" | tr \\n \\0 | xargs -0 xattr -v -l | grep com.apple.quarantine | cut -d : -f1
+}
+
+# Clear the quarantine attribute from the founded installer packages
+funcCLEARQUARANTINE () {
+  mdfind -onlyin "$pkgfolder" "kMDItemContentType   == 'com.apple.installer-package-archive'" | tr \\n \\0 | xargs -0 xattr -dr com.apple.quarantine {} \; 2> /dev/null
+}
+
+###SCRIPT###
+
+
+# check if a folder is added to rmaq as an option
+
+if [ $# -ne 1 ]; then
+    echo "Usage: rmaq /path/to/installer/packages"
+    exit 1
+
+fi
+
+# List ammount of installer packages
+clear
+
+echo ""
+echo "--------------------------------------------------"
+echo ""
+echo "These are the packages found in $pkgfolder:"
+echo ""
+funcLISTPACKAGES
+
+echo ""
+echo "Total:"
+funcTOTALPACKAGES
+
+
+# Exit the script if no packages are found
+countedfoundpackages=$(funcTOTALPACKAGES)
+
+if [[ $countedfoundpackages -eq 0 ]]; then
+echo "No Apple installer packages found, lets quit"
+exit 0
+else
+
+
+sleep 3
+clear
+
+# List ammount of installer packages containing the com.apple.quarantine attribute
+echo ""
+echo "---------------------------------------------------"
+echo ""
+echo "These packages contain the quarantine attribute:"
+echo ""
+funcPACKAGESWITHQUARANTINE
+
+echo ""
+echo "Total:"
+funcTOTALPACKAGESWITHQUARANTINE
+
+
+# Exit the script if no packages are found that contain the com.apple.quarantine attribute
+
+countedfoundquarantine=$(funcTOTALPACKAGESWITHQUARANTINE)
+
+if [[ $countedfoundquarantine -eq 0 ]]; then
+echo "All found packages didn't contain the com.apple.quarantine attribute, lets quit"
+exit 0
+else
+
+sleep 3
+clear
+
+# Ask to remove the quarantine attribute
+echo ""
+echo "---------------------------------------------------"
+echo ""
+echo "Do you want to remove the quarantine attribute from the found installer packages?"
+echo "[Use Y or N]"
+
+read -r ANSWER
+if [[ "$ANSWER" = [yY] ]] ; then
+  echo "You chose Y"
+  funcCLEARQUARANTINE
+  echo "quarantine is cleared from packages"
+  echo "Checking results"
+  echo "Total found packages with the quarantine attribute set:"
+  funcTOTALPACKAGESWITHQUARANTINE
+  echo "Done"
+else
+  echo "Done"
+fi
+fi
+fi
